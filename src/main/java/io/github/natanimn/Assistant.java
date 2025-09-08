@@ -2,21 +2,24 @@ package io.github.natanimn;
 
 import io.github.natanimn.telebof.BotClient;
 import io.github.natanimn.telebof.BotContext;
+import io.github.natanimn.telebof.annotations.CallbackHandler;
+import io.github.natanimn.telebof.annotations.InlineHandler;
+import io.github.natanimn.telebof.annotations.MessageHandler;
 import io.github.natanimn.telebof.enums.ChatMemberStatus;
+import io.github.natanimn.telebof.enums.ChatType;
+import io.github.natanimn.telebof.enums.MessageType;
 import io.github.natanimn.telebof.enums.ParseMode;
-import io.github.natanimn.telebof.filters.CustomFilter;
 import io.github.natanimn.telebof.types.chat_and_user.ChatPermissions;
 import io.github.natanimn.telebof.types.inline.InlineQueryResult;
 import io.github.natanimn.telebof.types.inline.InlineQueryResultArticle;
 import io.github.natanimn.telebof.types.input.InputTextMessageContent;
 import io.github.natanimn.telebof.types.keyboard.InlineKeyboardButton;
 import io.github.natanimn.telebof.types.keyboard.InlineKeyboardMarkup;
-import io.github.natanimn.telebof.types.keyboard.ReplyParameters;
+import io.github.natanimn.telebof.types.ReplyParameters;
 import io.github.natanimn.telebof.types.updates.CallbackQuery;
 import io.github.natanimn.telebof.types.updates.InlineQuery;
 import io.github.natanimn.telebof.types.updates.Message;
 import io.github.natanimn.util.Docs;
-import io.github.natanimn.util.IsAdmin;
 
 import java.io.IOException;
 
@@ -63,57 +66,35 @@ public class Assistant {
 
     public Assistant(String token){
         this.bot = new BotClient(token);
-
-        // Register command handlers
-        bot.onMessage(filter -> filter.commands("ask"), this::ask);
-        bot.onMessage(filter -> filter.commands("res"), this::res);
-        bot.onMessage(filter -> filter.commands("learn"), this::learn);
-        bot.onMessage(filter -> filter.commands("rules"), this::rules);
-        bot.onMessage(filter -> filter.commands("rtd"), this::rtd);
-        bot.onMessage(filter -> filter.commands("fmt") && filter.customFilter(new IsAdmin(bot)), this::fmt);
-        bot.onMessage(filter -> filter.commands("ban") && filter.customFilter(new IsAdmin(bot)), this::ban);
-        bot.onMessage(filter -> filter.commands("kick") && filter.customFilter(new IsAdmin(bot)), this::kick);
-        bot.onMessage(filter -> filter.commands("lock") && filter.customFilter(new IsAdmin(bot)), this::lock);
-        bot.onMessage(filter -> filter.commands("unlock") && filter.customFilter(new IsAdmin(bot)), this::unlock);
-        bot.onMessage(filter -> filter.commands("help"), this::help);
-        bot.onMessage(filter -> filter.newChatMember(), this::welcome);
-
-        CustomFilter via_bot_filter = (update) -> update.message.via_bot != null && !update.message.via_bot.username.equals("telebof_bot");
-        bot.onMessage(filter -> filter.leftChatMember() || filter.customFilter(via_bot_filter), this::delete);
-
-
-        // Register callback handlers
-        bot.onCallback(filter -> filter.regex("^(remove|unban):(\\d+)"), this::cbQuery);
-        bot.onCallback(filter -> filter.regex("read_rules:\\d+"), this::readRules);
-        bot.onCallback(filter -> filter.regex("i_read:\\d+"), this::iReadRules);
-
-
-        // Register inline handlers
-        bot.onInline(filter -> filter.emptyQuery(), this::emptyInline);
-        bot.onInline(_ -> true, this::searchInline);
+        bot.addHandler(this);
     }
 
-
+    @MessageHandler(commands = "ask")
     private void ask(BotContext context, Message message) {
         replyAndDelete(context, message, ASK);
     }
 
+    @MessageHandler(commands = "res")
     private void res(BotContext context, Message message) {
         replyAndDelete(context, message, RES);
     }
 
+    @MessageHandler(commands = "learn")
     private void learn(BotContext context, Message message) {
         replyAndDelete(context, message, LEARN);
     }
 
+    @MessageHandler(commands = "rules")
     private void rules(BotContext context, Message message) {
         replyAndDelete(context, message, RULES);
     }
 
+    @MessageHandler(commands = "rtd")
     private void rtd(BotContext context, Message message) {
         replyAndDelete(context, message, RTD);
     }
 
+    @MessageHandler(commands = "fmt")
     private void fmt(BotContext context, Message message) {
         context.deleteMessage(message.chat.id, message.message_id).exec();
         var reply_id = message.reply_to_message != null? message.reply_to_message.message_id: message.message_id;
@@ -125,7 +106,7 @@ public class Assistant {
                 .exec();
     }
 
-
+    @MessageHandler(commands = "ban", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void ban(BotContext context, Message message) {
         if (message.reply_to_message == null) return;
 
@@ -153,6 +134,7 @@ public class Assistant {
                 .exec();
     }
 
+    @MessageHandler(commands = "kick", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void kick(BotContext context, Message message) {
 
         if (message.reply_to_message == null) return;
@@ -188,11 +170,13 @@ public class Assistant {
         }).start();
     }
 
+    @MessageHandler(commands = "lock", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void lock(BotContext context, Message message) {
         context.setChatPermissions(message.chat.id, new ChatPermissions().canSendMessages(false)).exec();
         replyAndDelete(context, message, LOCKED);
     }
 
+    @MessageHandler(commands = "unlock", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void unlock(BotContext context, Message message) {
         context.setChatPermissions(message.chat.id, new ChatPermissions()
                 .canSendMessages(true)
@@ -206,6 +190,7 @@ public class Assistant {
         replyAndDelete(context, message, UNLOCKED);
     }
 
+    @MessageHandler(commands = "help")
     private void help(BotContext context, Message message) {
         context.deleteMessage(message.chat.id, message.message_id).exec();
         var reply_id = message.reply_to_message != null? message.reply_to_message.message_id: message.message_id;
@@ -216,9 +201,9 @@ public class Assistant {
                         new InlineKeyboardButton("Remove Help", "remove:" + message.from.id)
                 }))
                 .exec();
-//
     }
 
+    @CallbackHandler(regex = "^(remove|unban):(\\d+)")
     private void cbQuery(BotContext context, CallbackQuery callbackQuery) {
         String[] parts = callbackQuery.data.split(":");
         String action = parts[0];
@@ -255,40 +240,7 @@ public class Assistant {
         }
     }
 
-    private void emptyInline(BotContext context, InlineQuery query){
-        context.answerInlineQuery(query.id, new InlineQueryResult[]{
-                new InlineQueryResultArticle(
-                        "1",
-                        "\uD83D\uDCD6 Full documentation",
-                        new InputTextMessageContent("**\uD83D\uDCD6 Full documentation**\n\n__Full documentation is available @ https://natanimn.github.io/telebof")
-                                .parseMode(ParseMode.MARKDOWN)
-                )
-                        .description("Telebof is a modern Java wrapper for the Telegram Bot API, designed to make building bots fast, simple, and intuitive.")
-                        .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDCD6"),
-
-                new InlineQueryResultArticle(
-                        "2",
-                        "\uD83D\uDCD7 Examples",
-                        new InputTextMessageContent("**\uD83D\uDCD7 Examples**\n\nAvailable examples can be found @ https://natanimn.github.io/telebof/examples")
-                                .parseMode(ParseMode.MARKDOWN)
-                )
-                        .description("All examples are production-ready and can be run immediately after setting up your bot token credentials.")
-                        .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDCD7"),
-
-                new InlineQueryResultArticle(
-                        "3",
-                        "\uD83D\uDE07 Support",
-                        new InputTextMessageContent("\uD83D\uDE07 Support\n\nSupport the development of Telebof easily. [Read more](https://github.com/natanimn/telebof#support-the-project)")
-                                .parseMode(ParseMode.MARKDOWN)
-                )
-                        .description("Support the development of Telebof.")
-                        .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDE07")
-
-        })
-                .cacheTime(10)
-                .exec();
-    }
-
+    @MessageHandler(type = MessageType.NEW_CHAT_MEMBER)
     private void welcome(BotContext context, Message message){
         context.deleteMessage(message.chat.id, message.message_id).exec();
 
@@ -306,6 +258,7 @@ public class Assistant {
         }
     }
 
+    @CallbackHandler(regex = "read_rules:\\d+")
     private void readRules(BotContext context, CallbackQuery callback) {
         var id = Long.parseLong(callback.data.split(":")[1]);
 
@@ -321,6 +274,7 @@ public class Assistant {
                     .exec();
     }
 
+    @CallbackHandler(regex = "i_read:\\d+")
     private void iReadRules(BotContext context, CallbackQuery callback){
         var id = Long.parseLong(callback.data.split(":")[1]);
 
@@ -344,34 +298,69 @@ public class Assistant {
         }
     }
 
+    @InlineHandler
+    private void searchInline(BotContext context, InlineQuery query) {
+        if (query.query.isEmpty()) {
+            context.answerInlineQuery(query.id, new InlineQueryResult[]{
+                            new InlineQueryResultArticle(
+                                    "1",
+                                    "\uD83D\uDCD6 Full documentation",
+                                    new InputTextMessageContent("**\uD83D\uDCD6 Full documentation**\n\n__Full documentation is available @ https://natanimn.github.io/telebof")
+                                            .parseMode(ParseMode.MARKDOWN)
+                            )
+                                    .description("Telebof is a modern Java wrapper for the Telegram Bot API, designed to make building bots fast, simple, and intuitive.")
+                                    .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDCD6"),
 
-    private void searchInline(BotContext context, InlineQuery query){
-        try{
-            var results = Docs.searchMethods(query.query);
-            if(results.isEmpty())
-                results.add(new InlineQueryResultArticle(
+                            new InlineQueryResultArticle(
+                                    "2",
+                                    "\uD83D\uDCD7 Examples",
+                                    new InputTextMessageContent("**\uD83D\uDCD7 Examples**\n\nAvailable examples can be found @ https://natanimn.github.io/telebof/examples")
+                                            .parseMode(ParseMode.MARKDOWN)
+                            )
+                                    .description("All examples are production-ready and can be run immediately after setting up your bot token credentials.")
+                                    .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDCD7"),
+
+                            new InlineQueryResultArticle(
+                                    "3",
+                                    "\uD83D\uDE07 Support",
+                                    new InputTextMessageContent("\uD83D\uDE07 Support\n\nSupport the development of Telebof easily. [Read more](https://github.com/natanimn/telebof#support-the-project)")
+                                            .parseMode(ParseMode.MARKDOWN)
+                            )
+                                    .description("Support the development of Telebof.")
+                                    .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDE07")
+
+                    })
+                    .cacheTime(10)
+                    .exec();
+        } else {
+            try {
+                var results = Docs.searchMethods(query.query);
+                if (results.isEmpty())
+                    results.add(new InlineQueryResultArticle(
+                            "1",
+                            "404 Not found",
+                            new InputTextMessageContent("Search not found")
+                    ));
+
+                context.answerInlineQuery(query.id, results.toArray(InlineQueryResult[]::new))
+                        .cacheTime(25)
+                        .exec();
+
+
+            } catch (IOException e) {
+                var result = new InlineQueryResultArticle(
                         "1",
-                        "404 Not found",
-                        new InputTextMessageContent("Search not found")
-                ));
-
-            context.answerInlineQuery(query.id, results.toArray(InlineQueryResult[]::new))
-                    .cacheTime(25)
-                    .exec();
-
-
-        }catch (IOException e){
-            var result = new InlineQueryResultArticle(
-                    "1",
-                    "Server error",
-                    new InputTextMessageContent("Server error — Please try again later")
-            );
-            context.answerInlineQuery(query.id, new InlineQueryResult[]{result})
-                    .cacheTime(25)
-                    .exec();
+                        "Server error",
+                        new InputTextMessageContent("Server error — Please try again later")
+                );
+                context.answerInlineQuery(query.id, new InlineQueryResult[]{result})
+                        .cacheTime(25)
+                        .exec();
+            }
         }
     }
 
+    @MessageHandler(type = MessageType.LEFT_CHAT_MEMBER)
     private void delete(BotContext context, Message message){
         context.deleteMessage(message.chat.id, message.message_id).exec();
     }
@@ -420,7 +409,13 @@ public class Assistant {
     }
 
     public static void main(String[] args){
-        var token = System.getenv("TOKEN");
+        if (args.length < 1) {
+            System.out.println("Usage: java Assistant <token>");
+            System.out.println("Please provide a token as a command line argument");
+            System.exit(1);
+        }
+
+        String token = args[0];
         var assistant = new Assistant(token);
         assistant.run();
     }
