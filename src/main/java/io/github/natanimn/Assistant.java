@@ -410,8 +410,7 @@ public class Assistant {
     }
 
     public static void main(String[] args){
-        var token = System.getenv("TOKEN");
-        var assistant = new Assistant(token);
+        var assistant = new Assistant(args[0]);
         assistant.run();
     }
 }
