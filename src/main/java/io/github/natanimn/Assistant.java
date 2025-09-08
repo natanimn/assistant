@@ -201,6 +201,7 @@ public class Assistant {
                         new InlineKeyboardButton("Remove Help", "remove:" + message.from.id)
                 }))
                 .exec();
+
     }
 
     @CallbackHandler(regex = "^(remove|unban):(\\d+)")
@@ -409,13 +410,7 @@ public class Assistant {
     }
 
     public static void main(String[] args){
-        if (args.length < 1) {
-            System.out.println("Usage: java Assistant <token>");
-            System.out.println("Please provide a token as a command line argument");
-            System.exit(1);
-        }
-
-        String token = args[0];
+        var token = System.getenv("TOKEN");
         var assistant = new Assistant(token);
         assistant.run();
     }
