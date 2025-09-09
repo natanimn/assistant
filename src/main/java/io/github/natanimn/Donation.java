@@ -125,7 +125,6 @@ public class Donation {
                 )
                 .parseMode(ParseMode.HTML)
                 .exec();
-        context.refundStarPayment(message.from.id, message.successful_payment.telegram_payment_charge_id).exec();
     }
 
 }
