@@ -3,29 +3,19 @@ package io.github.natanimn;
 import io.github.natanimn.telebof.BotClient;
 import io.github.natanimn.telebof.BotContext;
 import io.github.natanimn.telebof.annotations.CallbackHandler;
-import io.github.natanimn.telebof.annotations.InlineHandler;
 import io.github.natanimn.telebof.annotations.MessageHandler;
 import io.github.natanimn.telebof.enums.ChatMemberStatus;
 import io.github.natanimn.telebof.enums.ChatType;
 import io.github.natanimn.telebof.enums.MessageType;
 import io.github.natanimn.telebof.enums.ParseMode;
 import io.github.natanimn.telebof.types.chat_and_user.ChatPermissions;
-import io.github.natanimn.telebof.types.inline.InlineQueryResult;
-import io.github.natanimn.telebof.types.inline.InlineQueryResultArticle;
-import io.github.natanimn.telebof.types.input.InputTextMessageContent;
 import io.github.natanimn.telebof.types.keyboard.InlineKeyboardButton;
 import io.github.natanimn.telebof.types.keyboard.InlineKeyboardMarkup;
 import io.github.natanimn.telebof.types.ReplyParameters;
 import io.github.natanimn.telebof.types.updates.CallbackQuery;
-import io.github.natanimn.telebof.types.updates.InlineQuery;
 import io.github.natanimn.telebof.types.updates.Message;
-import io.github.natanimn.util.Docs;
-
-import java.io.IOException;
 
 public class Assistant {
-    private final BotClient bot;
-
     private static final String ASK = """
     Sorry, your question is not well formulated. Please, be clear and try to follow the guidelines in the link below.
 
@@ -64,10 +54,17 @@ public class Assistant {
     6. Make your question clear
     """;
 
-    public Assistant(String token){
-        this.bot = new BotClient(token);
-        bot.addHandler(this);
-    }
+    static String START = """
+            <b>Welcome to @telebof_bot</b>
+            
+            /donate - Donate to the project
+            /rules  - Read chat rules
+            
+            <b>Github</b>: https://github.com/natanimn/telebof
+            <b>Docs</b>: https://natanimn.github.io/telebof
+            
+            Write <code>@telebof_bot methodName</code> to get available telegram methods in the library, or use the bellow button.
+            """;
 
     @MessageHandler(commands = "ask")
     private void ask(BotContext context, Message message) {
@@ -96,6 +93,7 @@ public class Assistant {
 
     @MessageHandler(commands = "fmt")
     private void fmt(BotContext context, Message message) {
+        if (!isAdmin(context, message)) return;
         context.deleteMessage(message.chat.id, message.message_id).exec();
         var reply_id = message.reply_to_message != null? message.reply_to_message.message_id: message.message_id;
 
@@ -109,7 +107,7 @@ public class Assistant {
     @MessageHandler(commands = "ban", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void ban(BotContext context, Message message) {
         if (message.reply_to_message == null) return;
-
+        if (!isAdmin(context, message)) return;
         var reply = message.reply_to_message;
         if (isAdmin(context, reply)) {
             var m = context.sendMessage(message.chat.id, "Sorry, I don't ban administrators").exec();
@@ -136,7 +134,7 @@ public class Assistant {
 
     @MessageHandler(commands = "kick", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void kick(BotContext context, Message message) {
-
+        if (!isAdmin(context, message)) return;
         if (message.reply_to_message == null) return;
 
         var reply = message.reply_to_message;
@@ -172,12 +170,14 @@ public class Assistant {
 
     @MessageHandler(commands = "lock", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void lock(BotContext context, Message message) {
+        if (!isAdmin(context, message)) return;
         context.setChatPermissions(message.chat.id, new ChatPermissions().canSendMessages(false)).exec();
         replyAndDelete(context, message, LOCKED);
     }
 
     @MessageHandler(commands = "unlock", chatType = {ChatType.SUPERGROUP, ChatType.GROUP})
     private void unlock(BotContext context, Message message) {
+        if (!isAdmin(context, message)) return;
         context.setChatPermissions(message.chat.id, new ChatPermissions()
                 .canSendMessages(true)
                 .canSendOtherMessages(true)
@@ -299,68 +299,6 @@ public class Assistant {
         }
     }
 
-    @InlineHandler
-    private void searchInline(BotContext context, InlineQuery query) {
-        if (query.query.isEmpty()) {
-            context.answerInlineQuery(query.id, new InlineQueryResult[]{
-                            new InlineQueryResultArticle(
-                                    "1",
-                                    "\uD83D\uDCD6 Full documentation",
-                                    new InputTextMessageContent("**\uD83D\uDCD6 Full documentation**\n\n__Full documentation is available @ https://natanimn.github.io/telebof")
-                                            .parseMode(ParseMode.MARKDOWN)
-                            )
-                                    .description("Telebof is a modern Java wrapper for the Telegram Bot API, designed to make building bots fast, simple, and intuitive.")
-                                    .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDCD6"),
-
-                            new InlineQueryResultArticle(
-                                    "2",
-                                    "\uD83D\uDCD7 Examples",
-                                    new InputTextMessageContent("**\uD83D\uDCD7 Examples**\n\nAvailable examples can be found @ https://natanimn.github.io/telebof/examples")
-                                            .parseMode(ParseMode.MARKDOWN)
-                            )
-                                    .description("All examples are production-ready and can be run immediately after setting up your bot token credentials.")
-                                    .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDCD7"),
-
-                            new InlineQueryResultArticle(
-                                    "3",
-                                    "\uD83D\uDE07 Support",
-                                    new InputTextMessageContent("\uD83D\uDE07 Support\n\nSupport the development of Telebof easily. [Read more](https://github.com/natanimn/telebof#support-the-project)")
-                                            .parseMode(ParseMode.MARKDOWN)
-                            )
-                                    .description("Support the development of Telebof.")
-                                    .thumbnailUrl("https://emoji.beeimg.com/\uD83D\uDE07")
-
-                    })
-                    .cacheTime(10)
-                    .exec();
-        } else {
-            try {
-                var results = Docs.searchMethods(query.query);
-                if (results.isEmpty())
-                    results.add(new InlineQueryResultArticle(
-                            "1",
-                            "404 Not found",
-                            new InputTextMessageContent("Search not found")
-                    ));
-
-                context.answerInlineQuery(query.id, results.toArray(InlineQueryResult[]::new))
-                        .cacheTime(25)
-                        .exec();
-
-
-            } catch (IOException e) {
-                var result = new InlineQueryResultArticle(
-                        "1",
-                        "Server error",
-                        new InputTextMessageContent("Server error — Please try again later")
-                );
-                context.answerInlineQuery(query.id, new InlineQueryResult[]{result})
-                        .cacheTime(25)
-                        .exec();
-            }
-        }
-    }
-
     @MessageHandler(type = MessageType.LEFT_CHAT_MEMBER)
     private void delete(BotContext context, Message message){
         context.deleteMessage(message.chat.id, message.message_id).exec();
@@ -404,13 +342,29 @@ public class Assistant {
     `*` Administrators only
     """;
 
+    @MessageHandler(commands = "start", chatType = ChatType.PRIVATE)
+    void start(BotContext context, Message message){
+        var split = message.text.split(" ");
 
-    void run(){
-        bot.startPolling();
+        if (split.length == 2){
+            if (split[1].equals("donate"))
+                new Donation().donate(context, message);
+        } else context.sendMessage(message.chat.id, START)
+                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[]{
+                        new InlineKeyboardButton("\uD83D\uDD0E Search methods").switchInlineQueryCurrentChat("")
+                }))
+                .parseMode(ParseMode.HTML)
+                .exec();
     }
 
+
     public static void main(String[] args){
-        var assistant = new Assistant(args[0]);
-        assistant.run();
+        var bot = new BotClient(args[0]);
+        bot.addHandler(new Assistant());
+        bot.addHandler(new Inline());
+        bot.addHandler(new Donation());
+
+        System.out.println("Bot started..");
+        bot.startPolling();
     }
 }
