@@ -357,6 +357,17 @@ public class Assistant {
                 .exec();
     }
 
+    @MessageHandler(commands = "ping", chatType = ChatType.PRIVATE)
+    void ping(BotContext context, Message message){
+        long receivedAt = System.currentTimeMillis();
+        var msg     = context.sendMessage(message.chat.id, "...").exec();
+        long sentAt = System.currentTimeMillis();
+        var latency = sentAt - receivedAt;
+        context.editMessageText("<code>Pong! %d ms</code>".formatted(latency), message.chat.id, msg.message_id)
+                .parseMode(ParseMode.HTML)
+                .exec();
+    }
+
 
     public static void main(String[] args){
         var bot = new BotClient(args[0]);
